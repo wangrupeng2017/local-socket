@@ -10,9 +10,5 @@
   "keywords": ["ipc","socket","broadcast","进程间通信","本地套接字","广播"],
   "homepage": "https://github.com/wangrupeng2017/local-socket",
   "git": "https://github.com/wangrupeng2017/local-socket",
-  "license": "ISC",
-  "bugs": {
-　　"url": "https://github.com/wangrupeng2017/local-socket/issues",
-　　"email": "1107344708@qq.com"
-  }
+  "license": "ISC"
 }
