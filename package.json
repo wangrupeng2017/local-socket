@@ -1,11 +1,18 @@
 {
   "name": "local-socket",
   "version": "1.0.0",
-  "description": "",
+  "description": "本地进程间通信的一种方式",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "220and284",
+  "keywords": ["ipc","socket","broadcast","进程间通信","本地套接字","广播"],
+  "homepage": "https://github.com/wangrupeng2017/local-socket",
+  "git": "https://github.com/wangrupeng2017/local-socket",
+  "license": "ISC",
+  "bugs": {
+　　"url": "https://github.com/wangrupeng2017/local-socket/issues",
+　　"email": "1107344708@qq.com"
+  }
 }
