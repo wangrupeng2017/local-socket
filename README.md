@@ -4,7 +4,7 @@
 
 ### 安装
 ```
-npm  intall  local-socket
+npm i local-socket
 ```
 
 ### API
