@@ -4,11 +4,6 @@ const Stream = require("stream");
 const { SocketStatus, SocketError, SocketMessage } = require("./socket_tools");
 
 
-//  @todo
-//  1.替换所有错误状态码
-//  2.连接失败/重复连接的错误及异常处理, (计划在构造函数中返回新的Promise包裹对象与结果给客户去处理)
-
-
 /**
  * 本地socket - 服务端
  * @function broadcast 发送广播消息
@@ -27,7 +22,7 @@ class Server {
   constructor(socket_file, msg_handle, timeout) {
     //  初始化参数存储
     this.socket_file = socket_file;
-    this.msg_handle  = msg_handle;
+    this.msg_handle  = msg_handle || new Function();
     //  对象相关属性初始化(状态,socket集合,错误状态码)
     this.error   = SocketError.NORMAL;
     this.status  = SocketStatus.UNSTART;

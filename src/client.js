@@ -12,19 +12,42 @@ class Client {
    * 创建本地socket[客户端]对象
    * @param {String} socket_file 本地socket文件
    * @param {Function} msg_handle 消息处理函数
-   * @param {String} uid 客户端标识
+   * @param {Object} options 选择配置项
+   * ```
+   * {
+   *   "uid": <String>客户端标识,
+   *   "reconnect": <Boolean>是否启用重连(true:启用,false:禁用)(默认:true),
+   *   "interval": <Number>尝试重连的间隔时长(ms)(默认:1000)
+   * }
+   * ```
    */
-  constructor(socket_file, msg_handle, uid=`${Date.now()}`) {
+  constructor(socket_file, msg_handle, options) {
     //  初始化参数存储
     this.socket_file = socket_file;
-    this.msg_handle  = msg_handle;
-    this.uid         = uid;
+    this.msg_handle  = msg_handle || new Function();
+    this.options     = options || {};
+    this.uid         = this.options.uid || `${Date.now()}`;
     //  对象相关属性初始化(错误码,状态码)
     this.error  = SocketError.NORMAL;
     this.status = SocketStatus.UNSTART;
     this.client = null;
-    //  连接服务器
-    this._connect();
+    
+    //  连接控制参数, reconnect:是否重连, interval:重连间隔时间
+    let { reconnect=true, interval=1000 } = this.options;
+    if ((typeof reconnect) != "boolean")     reconnect = true;
+    if ((typeof interval)  != "number")      interval  = 1000;
+    if (interval<200 || interval>1000*60*60) interval  = 1000;
+    //  尝试重连的定时器
+    const reconnect_timer = setInterval(async () => {
+      //  每次连接的等待时长(ms)
+      let timeout = interval < 1000 ? interval : 1000;
+      //  连接服务器
+      let result = await this._connect(timeout);
+      //  连接成功, 删除重连定时器
+      if (result == 0) return clearInterval(reconnect_timer);
+      //  未启用重连, 删除重连定时器
+      if (reconnect == false) return clearInterval(reconnect_timer);
+    }, interval);
   }
 
   /**

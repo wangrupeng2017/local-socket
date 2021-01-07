@@ -92,7 +92,7 @@ test();
 **/
 
 //  API - client.destroy
-// /**
+/**
 const test = async function() {
     let s1 = new Server("example1", (data, replay) => { console.log(`s1:${data}`); });
 
@@ -105,4 +105,18 @@ const test = async function() {
     }, 1000);
 }
 test();
-// **/
+**/
+
+
+
+//  测试先打开client, 后打开server的情况
+let client = new Client("test", (data) => { console.log(`client:${data}`); })
+
+setTimeout(() => {
+    let server = new Server("test", (data, replay) => { console.log(`server:${data}`) });
+    
+    setInterval(() => {
+        server.broadcast("hello client!");
+    }, 1000);
+}, 10000);
+

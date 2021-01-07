@@ -9,17 +9,17 @@ npm i local-socket
 
 ### API
 - #### Server
-  - [Server(socket_name, msg_handle[, timeout])](#Server)
+  - [Server(socket_name[, msg_handle[, timeout]])](#Server)
   - [server.broadcast(msg)](#server.broadcast)
   - [server.unicast(client_uid, msg)](#server.unicast)
   - [server.destroy()](#server.destroy)
 - #### Client
-  - [Client(socket_name, msg_handle[, uid])](#Client)
+  - [Client(socket_name[, msg_handle[, options]])](#Client)
   - [client.send(msg[, options[, timeout]])](#client.send)
   - [client.destroy()](#client.destroy)
 
 
-#### Server(socket_name, msg_handle[, timeout])<i id="Server"/>
+#### Server(socket_name[, msg_handle[, timeout]])<i id="Server"/>
 - **服务对象构造方法**
 - `socket_name` `<String>` 要绑定到的socket文件名
 - `msg_handle` `<Function>` 消息处理函数
@@ -32,7 +32,7 @@ npm i local-socket
 ```javascript
 const { Server } = require("local-socket");
 //  普通模式创建对象
-let s1 = new Server("example1", (data, replay) => {});
+let s1 = new Server("example1");
 //  异步模式创建服务对象
 let s2 = await new Server("example2", (data, replay) => {}, 5000);
 ```
@@ -43,7 +43,7 @@ let s2 = await new Server("example2", (data, replay) => {}, 5000);
 ```javascript
 const { Server, Client } = require("local-socket");
 
-let s1 = new Server("example1", (data, replay) => {});
+let s1 = new Server("example1");
 
 let c1 = new Client("example1", (data) => { console.log(`c1:${data}`); });
 //  c1:hello everyone!!!
@@ -60,11 +60,11 @@ await s1.broadcast("hello everyone!!!");
 ```javascript
 const { Server, Client } = require("local-socket");
 
-let s1 = new Server("example1", (data, replay) => {});
+let s1 = new Server("example1");
 
-let c1 = new Client("example1", (data) => { console.log(`c1:${data}`); }, "小明");
+let c1 = new Client("example1", (data) => { console.log(`c1:${data}`); }, { uid:"小明" });
 //  c1:hello 小明!!!
-let c2 = new Client("example1", (data) => { console.log(`c2:${data}`); }, "小红");
+let c2 = new Client("example1", (data) => { console.log(`c2:${data}`); }, { uid:"小红" });
 
 await s1.unicast("小明", "hello 小明!!!");
 ```
@@ -81,20 +81,23 @@ s1.destroy();
 await s1.broadcast("hello everyone!!!");
 ```
 
-#### Client(socket_name, msg_handle[, uid])<i id="Client"/>
+#### Client(socket_name[, msg_handle[, options]])<i id="Client"/>
 - **服务对象构造方法**
 - `socket_name` `<String>` 要连接到的socket文件名
 - `msg_handle` `<Function>` 消息处理函数
   - 函数格式:`void function(data)`
     - `data` `<Any>` 接收到的消息
-- `uid` `<String>` 用于被Server识别的uid
+- `options` `<Object>` 其他可选配置
+  - `uid` `<String>` 客户端标识
+  - `reconnect` `<Boolean>` 是否启用重连(true:启用,false:禁用)(默认:true)
+  - `interval` `<Number>` 尝试重连的间隔时长(单位:ms)(默认:1000)
 ```javascript
 const { Client } = require("local-socket");
 
 //  自动生成uid
-let c1 = new Client("example1", (data) => {});
+let c1 = new Client("example1");
 //  指定uid
-let c2 = new Client("example1", (data) => {}, "小明");
+let c2 = new Client("example1", (data) => {}, { uid:"小明" });
 ```
 
 #### client.send(msg[, options[, timeout]])<i id="client.send"/>
