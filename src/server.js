@@ -139,7 +139,6 @@ class Server {
     this.server.unref();
     this.status  = SocketStatus.DESTROYED;
     this.error   = SocketError.NORMAL;
-    this.sockets = null;
     this.stream  = null;
 
     //  返回操作结果
