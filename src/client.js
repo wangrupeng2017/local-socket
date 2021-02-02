@@ -1,5 +1,6 @@
 
 const net = require("net");
+const { EventEmitter } = require("events");
 const { SocketStatus, SocketError, SocketMessage } = require("./socket_tools");
 
 /**
@@ -8,6 +9,12 @@ const { SocketStatus, SocketError, SocketMessage } = require("./socket_tools");
  * @function destroy !!!销毁对象,销毁后无法再次使用
  */
 class Client {
+  //  事件触发对象<EventEmitter>, 用来进行"连接"通知
+  _emitter = new EventEmitter();
+  //  连接超时定时器<Timer>
+  _connect_timer = null;
+
+
   /**
    * 创建本地socket[客户端]对象
    * @param {String} socket_file 本地socket文件
@@ -32,22 +39,8 @@ class Client {
     this.status = SocketStatus.UNSTART;
     this.client = null;
     
-    //  连接控制参数, reconnect:是否重连, interval:重连间隔时间
-    let { reconnect=true, interval=1000 } = this.options;
-    if ((typeof reconnect) != "boolean")     reconnect = true;
-    if ((typeof interval)  != "number")      interval  = 1000;
-    if (interval<200 || interval>1000*60*60) interval  = 1000;
-    //  尝试重连的定时器
-    const reconnect_timer = setInterval(async () => {
-      //  每次连接的等待时长(ms)
-      let timeout = interval < 1000 ? interval : 1000;
-      //  连接服务器
-      let result = await this._connect(timeout);
-      //  连接成功, 删除重连定时器
-      if (result == 0) return clearInterval(reconnect_timer);
-      //  未启用重连, 删除重连定时器
-      if (reconnect == false) return clearInterval(reconnect_timer);
-    }, interval);
+    //  启动自动重连机制(定时器)
+    this._start_auto_connect();
   }
 
   /**
@@ -99,6 +92,11 @@ class Client {
       //  更新错误状态码,"操作成功"
       return this.error = SocketError.NORMAL;
     }
+    //  清除自动重连定时器
+    if (this._connect_timer != null) {
+      clearInterval(this._connect_timer);
+      this._connect_timer = null;
+    }
 
     //  主动关闭服务
     this._close();
@@ -148,13 +146,17 @@ class Client {
     //  更新状态为"启动中"
     this.status = SocketStatus.STARTING;
 
-    let start_time = Date.now();
-
     //  创建socket对象,绑定相关事件处理方法,并设置监听
     this.client = net.createConnection(`\\\\?\\pipe\\${this.socket_file}`);
     this.client.on("connect", this._connect_handle.bind(this));
     this.client.on("data",    this._data_handle.bind(this));
-    this.client.on("close",  () => { });
+    this.client.on("close",  () => { 
+      //  工作中如果断开了连接, 则再次启动重连机制
+      if (this.status==SocketStatus.WORKING) {
+        this.status = SocketStatus.UNSTART
+        this._start_auto_connect();
+      }
+    });
     this.client.on("drain",  () => { });
     this.client.on("end",    () => { });
     this.client.on("error", err => { });
@@ -163,20 +165,38 @@ class Client {
     this.client.on("timeout",() => { });
     this.client.setEncoding("utf8");
 
-    //  等待socket对象连接成功
-    while (this.status != SocketStatus.WORKING) {
-      //  连接超时
-      if ((Date.now() - start_time) > timeout) {
-        this._close();
-        //  更新错误状态码,"连接失败/超时"
-        return this.error = SocketError.CONNECT_TIMEOUT;
-      }
-      //  延时等待10ms
-      await new Promise((res, rej) => setTimeout(res, 10));
-    }
 
-    //  连接成功,"操作成功"
-    return this.error = SocketError.NORMAL;
+    //  连接事件 Promise
+    const connect_promise = new Promise((res, rej) => {
+      this._emitter.on("connect", res);
+    })
+    //  连接超时 Promise
+    const timeout_promise = new Promise((res, rej) => {
+      this._connect_timer = setTimeout(() => {
+        //  更新错误状态码,"连接失败/超时"
+        this.error = SocketError.CONNECT_TIMEOUT;
+        //  返回连接失败/超时结果(false)
+        res(false);
+      }, timeout);
+    })
+
+    //  等待 连接超时/连接成功 2个条件谁先成立
+    return Promise.race([ timeout_promise, connect_promise ]).then(result => {
+      //  清除连接事件监听 和 连接超时定时器
+      this._emitter.removeAllListeners("connect");
+      if (this._connect_timer != null) {
+        clearTimeout(this._connect_timer);
+        this._connect_timer = null;
+      }
+
+      //  false:连接失败/超时, true:连接成功
+      (result == false) 
+        ? this._close()
+        : this.error = SocketError.NORMAL;
+
+      //  返回连接结果, true:连接成功, false:连接失败
+      return result ? 0 : -1;
+    });
   }
 
   /**
@@ -197,13 +217,54 @@ class Client {
   }
 
   /**
+   * 启动自动重连机制(定时器)
+   * @return {Boolean} 启动结果, true:启动成功, false:启动失败
+   */ 
+  _start_auto_connect() {
+    //  如果当前对象处于 已销毁(DESTROYED)或启动中(STARTING)
+    //  则直接返回, 不再进行后边的操作.
+    if ((this.status==SocketStatus.DESTROYED)
+    ||  (this.status==SocketStatus.STARTING)) {
+      return false;
+    }
+
+    //  如果重连定时器存在则表示重连机制启动中
+    if (this.reconnect_timer) 
+      return false;
+
+    //  连接控制参数, reconnect:是否重连, interval:重连间隔时间
+    let { reconnect=true, interval=1000 } = this.options;
+    if ((typeof reconnect) != "boolean")     reconnect = true;
+    if ((typeof interval)  != "number")      interval  = 1000;
+    if (interval<200 || interval>1000*60*60) interval  = 1000;
+    //  尝试重连的定时器
+    this.reconnect_timer = setInterval(async () => {
+      //  每次连接的等待时长(ms)
+      let timeout = interval < 1000 ? interval : 1000;
+      //  连接服务器
+      let result = await this._connect(timeout);
+      //  连接成功 或 未启用重连机制
+      //  则 删除重连定时器.
+      if ((result==0) || (reconnect==false)) {
+        clearInterval(this.reconnect_timer);
+        this.reconnect_timer = null;
+      }
+    }, interval);
+
+    return true;
+  }
+
+  /**
    * 连接成功事件处理函数
    */
+  //  更新客户端状态
   _connect_handle() {
-    //  更新客户端状态
     this.status = SocketStatus.WORKING;
     //  连接成功后自动发送自身标识消息到服务端
     this.client.write(SocketMessage.serialize("connect", this.uid));
+
+    //  触发事件 "connect":连接成功
+    this._emitter.emit("connect", true);
   }
 
   /**

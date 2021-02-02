@@ -110,6 +110,7 @@ test();
 
 
 //  测试先打开client, 后打开server的情况
+/**
 let client = new Client("test", (data) => { console.log(`client:${data}`); })
 
 setTimeout(() => {
@@ -119,4 +120,4 @@ setTimeout(() => {
         server.broadcast("hello client!");
     }, 1000);
 }, 10000);
-
+**/

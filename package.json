@@ -1,6 +1,6 @@
 {
   "name": "local-socket",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "本地进程间通信的一种方式",
   "main": "index.js",
   "scripts": {
